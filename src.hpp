@@ -7,7 +7,7 @@
 #include <cmath>
 #include <algorithm>
 
-typedef std::vector<std::vector<double> > IMAGE_T;
+// Do not redefine IMAGE_T; use explicit type to avoid typedef conflicts with OJ
 
 namespace nr_heur {
 
@@ -17,7 +17,7 @@ static int H = 28, W = 28;
 
 static double clamp01(double x){ return x < 0 ? 0 : (x > 1 ? 1 : x); }
 
-static double otsu_threshold(const IMAGE_T &img){
+static double otsu_threshold(const std::vector<std::vector<double> > &img){
     // Build 256-bin histogram over [0,1]
     const int bins = 256;
     std::vector<double> hist(bins, 0.0);
@@ -51,7 +51,7 @@ static double otsu_threshold(const IMAGE_T &img){
     return (double)best_t / (bins - 1);
 }
 
-static std::vector<std::vector<unsigned char> > binarize(const IMAGE_T &img){
+static std::vector<std::vector<unsigned char> > binarize(const std::vector<std::vector<double> > &img){
     H = (int)img.size();
     W = H ? (int)img[0].size() : 0;
     double t = otsu_threshold(img);
@@ -140,7 +140,7 @@ static int count_endpoints4(const std::vector<std::vector<unsigned char> > &bw, 
 
 } // namespace nr_heur
 
-int judge(IMAGE_T &img){
+int judge(std::vector<std::vector<double> > &img){
     using namespace nr_heur;
     if (img.empty() || img[0].empty()) return 0;
     std::vector<std::vector<unsigned char> > bw = binarize(img);
