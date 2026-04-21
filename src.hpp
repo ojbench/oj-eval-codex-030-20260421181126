@@ -6,9 +6,8 @@
 #include <queue>
 #include <cmath>
 #include <algorithm>
-#include <cstdint>
 
-typedef std::vector<std::vector<double>> IMAGE_T;
+typedef std::vector<std::vector<double> > IMAGE_T;
 
 namespace nr_heur {
 
@@ -52,13 +51,13 @@ static double otsu_threshold(const IMAGE_T &img){
     return (double)best_t / (bins - 1);
 }
 
-static std::vector<std::vector<uint8_t>> binarize(const IMAGE_T &img){
+static std::vector<std::vector<unsigned char> > binarize(const IMAGE_T &img){
     H = (int)img.size();
     W = H ? (int)img[0].size() : 0;
     double t = otsu_threshold(img);
     // Slight bias to prefer foreground being bright digits
     double thr = std::max(0.3, std::min(0.7, t * 0.9));
-    std::vector<std::vector<uint8_t>> bw(H, std::vector<uint8_t>(W, 0));
+    std::vector<std::vector<unsigned char> > bw(H, std::vector<unsigned char>(W, 0));
     for (int i = 0; i < H; ++i) {
         for (int j = 0; j < W; ++j) {
             bw[i][j] = (img[i][j] > thr) ? 1 : 0;
@@ -67,7 +66,7 @@ static std::vector<std::vector<uint8_t>> binarize(const IMAGE_T &img){
     return bw;
 }
 
-static BBox bounding_box(const std::vector<std::vector<uint8_t>> &bw){
+static BBox bounding_box(const std::vector<std::vector<unsigned char> > &bw){
     int r0 = H, c0 = W, r1 = -1, c1 = -1;
     for (int i = 0; i < H; ++i) for (int j = 0; j < W; ++j) if (bw[i][j]) {
         r0 = std::min(r0, i); c0 = std::min(c0, j);
@@ -77,27 +76,27 @@ static BBox bounding_box(const std::vector<std::vector<uint8_t>> &bw){
     return {r0,c0,r1,c1};
 }
 
-static int count_area(const std::vector<std::vector<uint8_t>> &bw, const BBox &b){
+static int count_area(const std::vector<std::vector<unsigned char> > &bw, const BBox &b){
     if (b.r1 < b.r0) return 0;
     int a = 0; for (int i=b.r0;i<=b.r1;++i) for (int j=b.c0;j<=b.c1;++j) a+=bw[i][j]; return a;
 }
 
-static int count_holes(const std::vector<std::vector<uint8_t>> &bw, const BBox &b){
+static int count_holes(const std::vector<std::vector<unsigned char> > &bw, const BBox &b){
     if (b.r1 < b.r0) return 0;
     int h = b.h(), w = b.w();
-    std::vector<std::vector<uint8_t>> seen(h, std::vector<uint8_t>(w, 0));
-    auto inb = [&](int r,int c){return r>=0&&r<h&&c>=0&&c<w;};
-    auto is_bg = [&](int r,int c){ return bw[b.r0+r][b.c0+c]==0; };
+    std::vector<std::vector<unsigned char> > seen(h, std::vector<unsigned char>(w, 0));
+    struct Helper { static bool inb(int r,int c,int h,int w){return r>=0&&r<h&&c>=0&&c<w;} };
     int dr[4]={-1,1,0,0}; int dc[4]={0,0,-1,1};
     int components_bg = 0; int touch_border = 0;
-    for (int i=0;i<h;++i) for (int j=0;j<w;++j) if (!seen[i][j] && is_bg(i,j)){
+    for (int i=0;i<h;++i) for (int j=0;j<w;++j) if (!seen[i][j] && (bw[b.r0+i][b.c0+j]==0)){
         components_bg++;
         bool touches = false;
-        std::queue<std::pair<int,int>>q; q.push({i,j}); seen[i][j]=1;
+        std::queue<std::pair<int,int> > q; q.push(std::make_pair(i,j)); seen[i][j]=1;
         while(!q.empty()){
-            auto [r,c]=q.front(); q.pop();
+            std::pair<int,int> p = q.front(); q.pop();
+            int r = p.first, c = p.second;
             if (r==0||c==0||r==h-1||c==w-1) touches = true;
-            for (int k=0;k<4;++k){int nr=r+dr[k], nc=c+dc[k]; if (inb(nr,nc)&&!seen[nr][nc]&&is_bg(nr,nc)){seen[nr][nc]=1; q.push({nr,nc});}}
+            for (int k=0;k<4;++k){int nr=r+dr[k], nc=c+dc[k]; if (Helper::inb(nr,nc,h,w) && !seen[nr][nc] && (bw[b.r0+nr][b.c0+nc]==0)){seen[nr][nc]=1; q.push(std::make_pair(nr,nc));}}
         }
         if (touches) touch_border++;
     }
@@ -107,7 +106,7 @@ static int count_holes(const std::vector<std::vector<uint8_t>> &bw, const BBox &
     return holes;
 }
 
-static void projections(const std::vector<std::vector<uint8_t>> &bw, const BBox &b,
+static void projections(const std::vector<std::vector<unsigned char> > &bw, const BBox &b,
                         std::vector<int> &hp, std::vector<int> &vp){
     hp.assign(b.h(), 0); vp.assign(b.w(), 0);
     for (int i=b.r0;i<=b.r1;++i){
@@ -117,7 +116,7 @@ static void projections(const std::vector<std::vector<uint8_t>> &bw, const BBox 
     }
 }
 
-static void center_of_mass(const std::vector<std::vector<uint8_t>> &bw, const BBox &b,
+static void center_of_mass(const std::vector<std::vector<unsigned char> > &bw, const BBox &b,
                            double &cy, double &cx){
     long long sum=0; long long sy=0, sx=0;
     for (int i=b.r0;i<=b.r1;++i){
@@ -127,7 +126,7 @@ static void center_of_mass(const std::vector<std::vector<uint8_t>> &bw, const BB
     cy = (double)sy / (double)sum; cx = (double)sx / (double)sum;
 }
 
-static int count_endpoints4(const std::vector<std::vector<uint8_t>> &bw, const BBox &b){
+static int count_endpoints4(const std::vector<std::vector<unsigned char> > &bw, const BBox &b){
     int ep = 0; int dr[4]={-1,1,0,0}; int dc[4]={0,0,-1,1};
     for (int i=b.r0;i<=b.r1;++i){
         for (int j=b.c0;j<=b.c1;++j){
@@ -144,7 +143,7 @@ static int count_endpoints4(const std::vector<std::vector<uint8_t>> &bw, const B
 int judge(IMAGE_T &img){
     using namespace nr_heur;
     if (img.empty() || img[0].empty()) return 0;
-    auto bw = binarize(img);
+    std::vector<std::vector<unsigned char> > bw = binarize(img);
     BBox b = bounding_box(bw);
     if (b.r1 < b.r0) return 0;
     int area = count_area(bw, b);
